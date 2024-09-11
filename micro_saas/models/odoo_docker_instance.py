@@ -2,7 +2,9 @@ import logging
 import os
 import socket
 import subprocess
+import warnings
 from datetime import datetime
+from odoo.exceptions import UserError
 
 from odoo import models, fields, api
 
@@ -197,10 +199,12 @@ class OdooDockerInstance(models.Model):
         # cargar el archivo docker-compose.yml en el campo binario docker_compose_file
         try:
             # Ejecuta el comando de Docker Compose para levantar la instancia
-            cmd = f"docker-compose -f {modified_path} up -d"
+            cmd = f"docker compose -f {modified_path} up -d"
             self.excute_command(cmd, shell=True, check=True)
             self.write({'state': 'running'})
         except Exception as e:
+            warnings.warn("Alerta de docker compose no existe", DeprecationWarning, stacklevel=2)
+            raise UserError("Error:"+str(e))
             self.write({'state': 'error'})
 
     def stop_instance(self):
@@ -212,7 +216,7 @@ class OdooDockerInstance(models.Model):
 
                 try:
                     # Ejecuta el comando de Docker Compose para detener la instancia
-                    cmd = f"docker-compose -f {modified_path} down"
+                    cmd = f"docker compose -f {modified_path} down"
                     self.excute_command(cmd, shell=True, check=True)
                     # Cambia la propiedad 'state' a 'stopped'
                     instance.write({'state': 'stopped'})
@@ -228,7 +232,7 @@ class OdooDockerInstance(models.Model):
                 modified_path = instance.instance_data_path + '/docker-compose.yml'
                 try:
                     # Ejecuta el comando de Docker Compose para detener la instancia
-                    cmd = f"docker-compose -f {modified_path} restart"
+                    cmd = f"docker compose -f {modified_path} restart"
                     self.excute_command(cmd, shell=True, check=True)
                     # Cambia la propiedad 'state' a 'stopped'
                     instance.write({'state': 'running'})
@@ -246,7 +250,7 @@ class OdooDockerInstance(models.Model):
 
                 try:
                     # Ejecuta el comando de Docker Compose para detener y eliminar los contenedores
-                    cmd = f"docker-compose -f {modified_path} down"
+                    cmd = f"docker compose -f {modified_path} down"
                     self.excute_command(cmd, shell=True, check=True)
                 except Exception as e:
                     pass
