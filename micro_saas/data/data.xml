@@ -182,5 +182,107 @@ services:
         ]"/>
         </record>
 
+        <!-- Template para Odoo 17 -->
+        <record id="docker_compose_template_odoo15" model="docker.compose.template">
+            <field name="name">Odoo 15</field>
+            <field name="sequence">30</field>
+            <field name="active">True</field>
+            <field name="template_dc_body"><![CDATA[
+services:
+  db-{{INSTANCE_NAME}}:
+    image: postgres:{{POSTGRES-VERSION}}
+    user: root
+    environment:
+      - POSTGRES_PASSWORD={{POSTGRES_PASSWORD}}
+      - POSTGRES_USER={{POSTGRES_USER}}
+      - POSTGRES_DB=postgres
+    restart: always
+    volumes:
+      - ./postgresql:/var/lib/postgresql/data
+    networks:
+      - db_network
+
+  odoo17-{{INSTANCE_NAME}}:
+    image: odoo:{{ODOO-VERSION}}
+    user: root
+    depends_on:
+      - db-{{INSTANCE_NAME}}
+    tty: true
+    command: >
+      --
+      --db_host=db-{{INSTANCE_NAME}}
+      --db_port={{DB_PORT}}
+      --db_user={{POSTGRES_USER}}
+      --db_password={{POSTGRES_PASSWORD}}
+    environment:
+      - HOST=db-{{INSTANCE_NAME}}
+      - USER={{POSTGRES_USER}}
+      - PASSWORD={{POSTGRES_PASSWORD}}
+    volumes:
+      - ./addons:/mnt/extra-addons
+      - ./etc:/etc/odoo
+      - ./data:/var/lib/odoo
+    restart: always
+    networks:
+      - proxy
+      - db_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      # Reglas y Middlewares con nombres únicos por instancia
+      - "traefik.http.routers.{{INSTANCE_NAME}}.rule=Host(`{{INSTANCE_NAME}}.{{BASE_HOSTNAME}}`)"
+      - "traefik.http.routers.{{INSTANCE_NAME}}.service={{INSTANCE_NAME}}"
+      - "traefik.http.routers.{{INSTANCE_NAME}}.entrypoints=https"
+      - "traefik.http.routers.{{INSTANCE_NAME}}.tls=true"
+      - "traefik.http.services.{{INSTANCE_NAME}}.loadbalancer.server.port=8069"
+
+      # Redirección HTTP a HTTPS
+      - "traefik.http.routers.{{INSTANCE_NAME}}-http.rule=Host(`{{INSTANCE_NAME}}.{{BASE_HOSTNAME}}`)"
+      - "traefik.http.routers.{{INSTANCE_NAME}}-http.entrypoints=http"
+      - "traefik.http.routers.{{INSTANCE_NAME}}-http.middlewares={{INSTANCE_NAME}}-redirect"
+      - "traefik.http.middlewares.{{INSTANCE_NAME}}-redirect.redirectscheme.scheme=https"
+
+      #----- routes for: odoo/web/database || odoo/website/info  -----
+      - "traefik.http.routers.{{INSTANCE_NAME}}-db.rule=(Host(`{{INSTANCE_NAME}}.{{BASE_HOSTNAME}}`)) && (PathPrefix(`/web/database`) || PathPrefix(`/website/info`))"
+      - "traefik.http.routers.{{INSTANCE_NAME}}-db.entrypoints=https"
+      - "traefik.http.routers.{{INSTANCE_NAME}}-db.service={{INSTANCE_NAME}}-db"
+      - "traefik.http.routers.{{INSTANCE_NAME}}-db.tls=true"
+      - "traefik.http.services.{{INSTANCE_NAME}}-db.loadbalancer.server.port=8069"
+      # db auth
+      - "traefik.http.middlewares.{{INSTANCE_NAME}}-auth.basicauth.users={{BASIC_AUTH_USERS}}"
+      - "traefik.http.routers.{{INSTANCE_NAME}}-db.middlewares={{INSTANCE_NAME}}-auth"
+
+networks:
+  proxy:
+    external: true
+  db_network:
+    external: true
+    
+]]></field>
+            <field name="variable_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {
+                'name': '{{POSTGRES-VERSION}}',
+                'demo_value': '15',
+            }),
+            (0, 0, {
+                'name': '{{ODOO-VERSION}}',
+                'demo_value': '17',
+            }),
+            (0, 0, {
+                'name': '{{DB-PORT}}',
+                'demo_value': '5432',
+            }),
+            (0, 0, {
+                'name': '{{POSTGRES_USER}}',
+                'demo_value': 'odoo',
+            }),
+            (0, 0, {
+                'name': '{{INSTANCE_NAME}}',
+                'demo_value': 'odoo17-i1',
+            }),
+        ]"/>
+        </record>
     </data>
 </odoo>
